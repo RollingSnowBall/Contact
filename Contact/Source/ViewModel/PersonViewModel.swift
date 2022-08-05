@@ -11,6 +11,7 @@ class PersonViewModel {
 
     var personList: [Person] = []
     var contactList: Dictionary<String,[Person]> = [:]
+    var filteredList: [Person] = []
     
     var numOfPeopleList: Int {
         
@@ -40,6 +41,18 @@ class PersonViewModel {
         
         contactList[firstString] = contactList[firstString]?.sorted { $0.firstName < $1.firstName }
         contactList[firstString] = contactList[firstString]?.sorted { $0.familyName < $1.familyName }
+    }
+    
+    func filteredPerson(keyword: String){
+        
+        filteredList = []
+        
+        personList.forEach { person in
+            if person.firstName.localizedCaseInsensitiveContains(keyword)
+            || person.familyName.localizedCaseInsensitiveContains(keyword) {
+                filteredList.append(person)
+            }
+        }
     }
     
     func peopleList(at index: Int) -> Person {

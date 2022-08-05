@@ -6,11 +6,29 @@
 //
 
 import UIKit
+import SnapKit
 
-class HomeViewController: UITableViewController {
+class HomeViewController: UIViewController {
 
     var contactInfo = PersonViewModel()
     var allSectionHeaderList = [String]()
+    var isFiltering: Bool {
+        let searchController = self.navigationItem.searchController
+        let isActive = searchController?.isActive ?? false
+        let isSearchBarHasText = searchController?.searchBar.text?.isEmpty == false
+        
+        return isActive && isSearchBarHasText
+    }
+    
+    private lazy var tableVC: UITableView = {
+        let tableView = UITableView()
+        
+        tableView.dataSource = self
+        
+        tableView.register(ContactCell.self, forCellReuseIdentifier: "ContactCell")
+        
+        return tableView
+    }()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -19,50 +37,6 @@ class HomeViewController: UITableViewController {
         setSearchBar()
         setTable()
         loadContactList()
-    }
-    
-    override func tableView(_ tableView: UITableView, sectionForSectionIndexTitle title: String, at index: Int) -> Int
-    {
-        return contactInfo.sectionHeaderList.firstIndex(of: title) ?? 0
-    }
-    
-    override func sectionIndexTitles(for tableView: UITableView) -> [String]? {
-        return allSectionHeaderList
-    }
-    
-    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        
-        if contactInfo.sectionHeaderList.count == 0 {
-            return nil
-        }
-        
-        return contactInfo.sectionHeaderList[section]
-    }
-    
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        sectionArray(at: section).count
-    }
-    
-    override func numberOfSections(in tableView: UITableView) -> Int {
-        contactInfo.sectionHeaderList.count
-    }
-    
-    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: false)
-        let person = sectionArray(at: indexPath.section)[indexPath.row]
-        
-        self.navigationController?.pushViewController(DetailViewController(person: person), animated: true)
-    }
-
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: "ContactCell", for: indexPath) as? ContactCell else { return UITableViewCell() }
-        
-        if(contactInfo.numOfPeopleList != 0){
-            let person = sectionArray(at: indexPath.section)[indexPath.row]
-            cell.setCell(contact: person)
-        }
-
-        return cell
     }
 }
 
@@ -88,13 +62,18 @@ private extension HomeViewController {
     func setSearchBar(){
         let searchController = UISearchController(searchResultsController: nil)
         searchController.searchBar.placeholder = "검색"
-        //searchController.searchResultsUpdater = self
+        searchController.searchResultsUpdater = self
         navigationItem.searchController = searchController
         navigationItem.hidesSearchBarWhenScrolling = false
     }
     
     func setTable(){
-        tableView.register(ContactCell.self, forCellReuseIdentifier: "ContactCell")
+        
+        view.addSubview(tableVC)
+        
+        tableVC.snp.makeConstraints{
+            $0.edges.equalToSuperview()
+        }
     }
     
     func saveContact(){
@@ -151,10 +130,100 @@ private extension HomeViewController {
     }
 }
 
-extension HomeViewController: AddContactRegisterDelegate{
+extension HomeViewController: AddContactRegisterDelegate, UITableViewDataSource, UISearchResultsUpdating {
+    
     func didSelectRegister(contact: Person) {
         contactInfo.addPerson(person: contact)
         saveContact()
-        self.tableView.reloadData()
+        tableVC.reloadData()
+    }
+    
+    func tableView(_ tableView: UITableView, sectionForSectionIndexTitle title: String, at index: Int) -> Int
+    {
+        if isFiltering {
+            return 0
+        }
+        else
+        {
+            return contactInfo.sectionHeaderList.firstIndex(of: title) ?? 0
+        }
+    }
+    
+    func sectionIndexTitles(for tableView: UITableView) -> [String]? {
+        if isFiltering {
+            return nil
+        }
+        else
+        {
+            return allSectionHeaderList
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        
+        if contactInfo.sectionHeaderList.count == 0 {
+            return nil
+        }
+        
+        if isFiltering {
+            return ""
+        }
+        else
+        {
+            return contactInfo.sectionHeaderList[section]
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        if isFiltering {
+            return contactInfo.filteredList.count
+        }
+        else
+        {
+            return sectionArray(at: section).count
+        }
+    }
+    
+    func numberOfSections(in tableView: UITableView) -> Int {
+        if isFiltering {
+            return 1
+        }
+        else
+        {
+            return contactInfo.sectionHeaderList.count
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: false)
+        let person = sectionArray(at: indexPath.section)[indexPath.row]
+        
+        self.navigationController?.pushViewController(DetailViewController(person: person), animated: true)
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: "ContactCell", for: indexPath) as? ContactCell else { return UITableViewCell() }
+        
+        if isFiltering {
+            if(contactInfo.filteredList.count != 0){
+                let person = contactInfo.filteredList[indexPath.row]
+                cell.setCell(contact: person)
+            }
+        }
+        else
+        {
+            if(contactInfo.numOfPeopleList != 0){
+                let person = sectionArray(at: indexPath.section)[indexPath.row]
+                cell.setCell(contact: person)
+            }
+        }
+
+        return cell
+    }
+    
+    func updateSearchResults(for searchController: UISearchController) {
+        guard let text = searchController.searchBar.text else { return }
+        contactInfo.filteredPerson(keyword: text)
+        tableVC.reloadData()
     }
 }
